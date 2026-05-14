@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Voice Agent Integrator</title>
+  <style>
+    /* ── Reset & base ──────────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: #0f1117;
+      color: #e0e0e0;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      gap: 24px;
+      padding: 24px;
+    }
+
+    h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #90caf9;
+      letter-spacing: 0.5px;
+    }
+
+    /* ── Call card ─────────────────────────────────────────────────────────── */
+    .card {
+      background: #1a1d27;
+      border: 1px solid #2a2d3e;
+      border-radius: 20px;
+      padding: 36px 40px;
+      width: 100%;
+      max-width: 440px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 24px;
+      box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+    }
+
+    /* ── Avatar ────────────────────────────────────────────────────────────── */
+    .avatar {
+      width: 88px;
+      height: 88px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #1565c0, #0d47a1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2.4rem;
+      box-shadow: 0 0 0 6px rgba(21,101,192,0.25);
+      transition: box-shadow 0.3s;
+    }
+
+    .avatar.speaking {
+      box-shadow: 0 0 0 10px rgba(76,175,80,0.35), 0 0 0 20px rgba(76,175,80,0.15);
+    }
+
+    /* ── Status badge ──────────────────────────────────────────────────────── */
+    #status {
+      font-size: 0.85rem;
+      color: #90caf9;
+      background: rgba(144,202,249,0.08);
+      border: 1px solid rgba(144,202,249,0.2);
+      border-radius: 999px;
+      padding: 4px 14px;
+      min-width: 160px;
+      text-align: center;
+    }
+
+    /* ── Waveform canvas ───────────────────────────────────────────────────── */
+    #waveform {
+      width: 100%;
+      height: 60px;
+      border-radius: 10px;
+      background: #0f1117;
+    }
+
+    /* ── Transcript / reply panels ─────────────────────────────────────────── */
+    .speech-panels {
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .speech-panel {
+      border-radius: 10px;
+      padding: 10px 14px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      min-height: 42px;
+      word-break: break-word;
+    }
+
+    #transcript {
+      background: rgba(33,150,243,0.08);
+      border: 1px solid rgba(33,150,243,0.2);
+      color: #90caf9;
+    }
+
+    #reply {
+      background: rgba(76,175,80,0.08);
+      border: 1px solid rgba(76,175,80,0.2);
+      color: #a5d6a7;
+    }
+
+    /* ── Call buttons ──────────────────────────────────────────────────────── */
+    .btn-row {
+      display: flex;
+      gap: 28px;
+      justify-content: center;
+    }
+
+    .btn-call {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      border: none;
+      cursor: pointer;
+      font-size: 1.6rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .btn-call:not(:disabled):hover  { transform: scale(1.1); }
+    .btn-call:not(:disabled):active { transform: scale(0.95); }
+
+    #btn-start {
+      background: #2e7d32;
+      box-shadow: 0 4px 20px rgba(46,125,50,0.5);
+    }
+
+    #btn-start:disabled {
+      background: #2e7d3260;
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+
+    #btn-end {
+      background: #c62828;
+      box-shadow: 0 4px 20px rgba(198,40,40,0.5);
+    }
+
+    #btn-end:disabled {
+      background: #c6282860;
+      box-shadow: none;
+      cursor: not-allowed;
+    }
+
+    /* ── Activity log ──────────────────────────────────────────────────────── */
+    .log-section {
+      width: 100%;
+      max-width: 440px;
+    }
+
+    .log-section summary {
+      cursor: pointer;
+      font-size: 0.78rem;
+      color: #666;
+      user-select: none;
+    }
+
+    #log {
+      margin-top: 8px;
+      background: #0c0e16;
+      border: 1px solid #1e2130;
+      border-radius: 8px;
+      padding: 10px 12px;
+      max-height: 160px;
+      overflow-y: auto;
+      font-family: monospace;
+      font-size: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .log-info  { color: #78909c; }
+    .log-error { color: #ef9a9a; }
+
+    /* ── Pulse animation for recording ────────────────────────────────────── */
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50%       { opacity: 0.4; }
+    }
+
+    .recording #status {
+      animation: pulse 1.4s ease-in-out infinite;
+      border-color: rgba(33,150,243,0.5);
+      color: #64b5f6;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🎙 Voice Agent Integrator</h1>
+
+  <div class="card" id="call-card">
+
+    <div class="avatar" id="avatar">🤖</div>
+
+    <div id="status">Ready – press &#x1F4DE; to start</div>
+
+    <canvas id="waveform" width="360" height="60"></canvas>
+
+    <div class="speech-panels">
+      <div class="speech-panel" id="transcript">You: –</div>
+      <div class="speech-panel" id="reply">Agent: –</div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-call" id="btn-start" title="Start call">📞</button>
+      <button class="btn-call" id="btn-end"   title="End call" disabled>📵</button>
+    </div>
+
+  </div>
+
+  <details class="log-section">
+    <summary>Activity log</summary>
+    <div id="log"></div>
+  </details>
+
+  <script src="/static/app.js"></script>
+  <script>
+    // Extra UI: pulse card while recording, animate avatar while agent speaks
+    const card   = document.getElementById("call-card");
+    const avatar = document.getElementById("avatar");
+
+    // Observe status changes to toggle CSS classes
+    const observer = new MutationObserver(() => {
+      const s = document.getElementById("status").textContent;
+      card.classList.toggle("recording", s.startsWith("Listening"));
+      avatar.classList.toggle("speaking", s.startsWith("Agent speaking"));
+    });
+    observer.observe(document.getElementById("status"), { childList: true, characterData: true, subtree: true });
+  </script>
+</body>
+</html>
