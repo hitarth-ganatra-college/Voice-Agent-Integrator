@@ -1,7 +1,7 @@
 """stt.py – Speech-to-Text using the OpenAI Whisper API."""
 
+import io
 import os
-import tempfile
 
 from openai import AsyncOpenAI
 
@@ -29,32 +29,28 @@ async def transcribe_audio(audio_data: bytes, mime_hint: str = "audio/webm") -> 
     audio_data:
         Raw audio bytes received from the browser (WebM/Opus by default).
     mime_hint:
-        MIME type used to choose the temp-file extension so Whisper can
-        identify the codec.  Defaults to ``audio/webm``.
+        MIME type used as a format hint for the OpenAI SDK (sets the
+        ``name`` attribute on the in-memory file so Whisper can identify
+        the codec).  No temporary files are created.  Defaults to
+        ``audio/webm``.
     """
     ext_map = {
-        "audio/webm": ".webm",
-        "audio/ogg": ".ogg",
-        "audio/wav": ".wav",
-        "audio/mp4": ".mp4",
-        "audio/mpeg": ".mp3",
+        "audio/webm": "audio.webm",
+        "audio/ogg":  "audio.ogg",
+        "audio/wav":  "audio.wav",
+        "audio/mp4":  "audio.mp4",
+        "audio/mpeg": "audio.mp3",
     }
-    suffix = ext_map.get(mime_hint, ".webm")
+    filename = ext_map.get(mime_hint, "audio.webm")
 
-    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
-        tmp.write(audio_data)
-        tmp_path = tmp.name
+    # Wrap the raw bytes in an in-memory file-like object so no data ever
+    # touches disk, eliminating temporary-file accumulation and privacy risks.
+    audio_file = io.BytesIO(audio_data)
+    audio_file.name = filename  # OpenAI SDK uses .name to detect the format
 
-    try:
-        client = _get_client()
-        with open(tmp_path, "rb") as audio_file:
-            transcript = await client.audio.transcriptions.create(
-                model="whisper-1",
-                file=audio_file,
-            )
-        return transcript.text.strip()
-    finally:
-        try:
-            os.unlink(tmp_path)
-        except OSError:
-            pass
+    client = _get_client()
+    transcript = await client.audio.transcriptions.create(
+        model="whisper-1",
+        file=audio_file,
+    )
+    return transcript.text.strip()

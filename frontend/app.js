@@ -42,6 +42,7 @@ let audioChunks      = [];
 let audioCtx         = null;
 let analyser         = null;
 let silenceTimer     = null;
+let silenceCheckInterval = null;
 let animFrameId      = null;
 let micStream        = null;
 let isRecording      = false;
@@ -176,9 +177,10 @@ function stopMediaRecorder() {
 
 // ── Silence detection ─────────────────────────────────────────────────────────
 function startSilenceDetection() {
+    clearInterval(silenceCheckInterval);
     clearTimeout(silenceTimer);
-    const data = new Float32Array(analyser.fftSize);
     silenceTimer = null;
+    const data = new Float32Array(analyser.fftSize);
 
     const check = () => {
         if (!isRecording || agentSpeaking) return;
@@ -197,10 +199,8 @@ function startSilenceDetection() {
     };
 
     // Use setInterval for silence checks (separate from animation frame)
-    return setInterval(check, ANALYSIS_INTERVAL);
+    silenceCheckInterval = setInterval(check, ANALYSIS_INTERVAL);
 }
-
-let silenceCheckInterval = null;
 
 function stopSilenceDetection() {
     clearInterval(silenceCheckInterval);
@@ -284,7 +284,7 @@ function scheduleResumeListening(delayMs) {
 async function startListening() {
     if (!micStream || !ws || ws.readyState !== WebSocket.OPEN || agentSpeaking) return;
     startMediaRecorder(micStream);
-    silenceCheckInterval = startSilenceDetection();
+    startSilenceDetection();
     setStatus("Listening… (speak now)");
 }
 

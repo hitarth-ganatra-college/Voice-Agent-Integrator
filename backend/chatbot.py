@@ -22,6 +22,7 @@ _system_prompt: str = os.getenv(
     "You are a helpful, friendly voice assistant. Keep replies short and conversational.",
 )
 _openai_client: AsyncOpenAI | None = None
+_http_client: httpx.AsyncClient | None = None
 
 
 def _get_openai_client() -> AsyncOpenAI:
@@ -35,6 +36,13 @@ def _get_openai_client() -> AsyncOpenAI:
             )
         _openai_client = AsyncOpenAI(api_key=api_key)
     return _openai_client
+
+
+def _get_http_client() -> httpx.AsyncClient:
+    global _http_client
+    if _http_client is None:
+        _http_client = httpx.AsyncClient(timeout=30.0)
+    return _http_client
 
 
 async def get_response(user_text: str) -> str:
@@ -65,8 +73,8 @@ async def _openai_backend(user_text: str) -> str:
 
 
 async def _custom_backend(user_text: str) -> str:
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        response = await client.post(_chatbot_url, json={"text": user_text})
-        response.raise_for_status()
-        data = response.json()
-        return str(data.get("msg", "")).strip()
+    client = _get_http_client()
+    response = await client.post(_chatbot_url, json={"text": user_text})
+    response.raise_for_status()
+    data = response.json()
+    return str(data.get("msg", "")).strip()
